@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"github.com/AlexanderSolman/go_pokedex/internal"
+	"time"
+
+	pokecache "github.com/AlexanderSolman/go_pokedex/internal"
 )
 
 type cliCommand struct {
@@ -70,7 +72,7 @@ func parseJsonResponse(res *http.Response, locationArea *jsonResponse) {
 
 func main() {
 	var locationArea jsonResponse
-
+	pokecache.NewCache(5 * time.Minute)
 	for {
 		fmt.Println("pokedex >")
 
