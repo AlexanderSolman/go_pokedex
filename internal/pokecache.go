@@ -21,12 +21,25 @@ func NewCache(interval time.Duration) {
 	go cache.reapLoop(interval)
 }
 
-func (c *Cache) Add() {
+func (c *Cache) Add(key string, val []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
+	c.m[key] = cacheEntry{
+		createdAt: time.Now(),
+		val:       val,
+	}
 }
 
-func (c *Cache) Get() {
+func (c *Cache) Get(key string) ([]byte, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
+	if val, ok := c.m[key]; !ok {
+		return nil, false
+	} else {
+		return val.val, true
+	}
 }
 
 func (c *Cache) reapLoop(interval time.Duration) {
