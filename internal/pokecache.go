@@ -8,6 +8,8 @@ import (
 type cacheEntry struct {
 	createdAt time.Time //holds the time of caching
 	val       []byte    //holds the data we are caching
+	next      string    //next url
+	prev      string    //previous url
 }
 
 type Cache struct {
@@ -15,33 +17,39 @@ type Cache struct {
 	m  map[string]cacheEntry //the cache itself, the key is the url, the value is the data and time
 }
 
-func NewCache(interval time.Duration) {
-	cache := Cache{m: make(map[string]cacheEntry)}
-
+// Creates a new cache and returns a pointer of the cache to the caller
+func NewCache(interval time.Duration) *Cache {
+	cache := &Cache{m: make(map[string]cacheEntry)}
 	go cache.reapLoop(interval)
+	return cache
 }
 
-func (c *Cache) Add(key string, val []byte) {
+// Add data to the cache, takes a url as key and data as val
+func (c *Cache) Add(key string, val []byte, next string, prev string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.m[key] = cacheEntry{
 		createdAt: time.Now(),
 		val:       val,
+		next:      next,
+		prev:      prev,
 	}
 }
 
-func (c *Cache) Get(key string) ([]byte, bool) {
+// Returns data if url as key exists and nil,false otherwise
+func (c *Cache) Get(key string) ([]byte, bool, string, string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if val, ok := c.m[key]; !ok {
-		return nil, false
+	if i, ok := c.m[key]; !ok {
+		return nil, false, i.next, i.prev
 	} else {
-		return val.val, true
+		return i.val, true, i.next, i.prev
 	}
 }
 
+// Checks if data gets too old and deletes it if thats the case
 func (c *Cache) reapLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
