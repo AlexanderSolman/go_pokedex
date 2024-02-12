@@ -28,7 +28,7 @@ type jsonResponse struct {
 	} `json:"results"`
 }
 
-func commands(command string) map[string]cliCommand {
+func commands() map[string]cliCommand {
 	return map[string]cliCommand{
 		"help": {
 			name:        "help",
@@ -63,6 +63,7 @@ func parseJsonResponse(res *http.Response, locationArea *jsonResponse) {
 	errr := json.Unmarshal(body, &locationArea)
 	if errr != nil {
 		fmt.Println(errr, "\nCould not parse json")
+		return
 	}
 
 	for _, i := range locationArea.Results {
@@ -72,7 +73,7 @@ func parseJsonResponse(res *http.Response, locationArea *jsonResponse) {
 
 func main() {
 	var locationArea jsonResponse
-	pokecache.NewCache(5 * time.Minute)
+	pokecache.NewCache(5 * time.Minute) //test line //TO BE MOVED
 	for {
 		fmt.Println("pokedex >")
 
@@ -84,11 +85,12 @@ func main() {
 			log.Fatal(err)
 		}
 
-		m_com := commands(scanner.Text())
+		m_com := commands()
 
 		switch scanner.Text() {
 		case "help":
-			fmt.Println("\nHow to use the Pokedex:\n\nhelp: ", m_com[scanner.Text()].description)
+			fmt.Println("\nHow to use the Pokedex:\n\n")
+			fmt.Println("help: ", m_com["help"].description)
 			fmt.Println("map:  ", m_com["map"].description)
 			fmt.Println("mapb: ", m_com["mapb"].description)
 			fmt.Println("exit: ", m_com["exit"].description, "\n")
