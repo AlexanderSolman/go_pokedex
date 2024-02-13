@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -38,6 +39,32 @@ type jsonLocationExplore struct {
 	} `json:"pokemon_encounters"`
 }
 
+type Pokemon struct {
+	BaseExperience int    `json:"base_experience"`
+	Height         int    `json:"height"`
+	Name           string `json:"name"`
+	Stats          []struct {
+		BaseStat int `json:"base_stat"`
+		Effort   int `json:"effort"`
+		Stat     struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"stat"`
+	} `json:"stats"`
+	Types []struct {
+		Type struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"type"`
+	} `json:"types"`
+	Weight int `json:"weight"`
+	caught bool
+}
+
+type pokedex struct {
+	m map[string]Pokemon
+}
+
 func commands() map[string]cliCommand {
 	return map[string]cliCommand{
 		"help": {
@@ -59,6 +86,14 @@ func commands() map[string]cliCommand {
 		"explore": {
 			name:        "explore",
 			description: "explore <location-area> lists pokemon in the area",
+		},
+		"catch": {
+			name:        "catch",
+			description: "Try to catch a Pokémon and add it to the pokedex",
+		},
+		"inspect": {
+			name:        "inspect",
+			description: "",
 		},
 	}
 }
@@ -113,10 +148,39 @@ func parseJsonExplore(res *http.Response, locationExplore *jsonLocationExplore) 
 	return addExplored
 }
 
+func parsePokemon(res *http.Response, pokemon *Pokemon) {
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+
+	if res.StatusCode > 299 {
+		log.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	errr := json.Unmarshal(body, &pokemon)
+	if errr != nil {
+		fmt.Println(errr, "\nCould not parse json")
+		return
+	}
+}
+
+func catchingThePokemon(exp int) bool {
+	// Base exp is our limit, if we roll > 0.75 * base exp we catch the pokemon
+	catchChance := rand.Intn(exp)
+	if float64(catchChance) >= (float64(exp) * 0.75) {
+		return true
+	}
+	return false
+}
+
 func main() {
 	var locationArea jsonLocationResponse
 	var locationExplore jsonLocationExplore
+	var pokemon Pokemon
 	cache := pokecache.NewCache(5 * time.Minute) // Cache created at start with 5min interval
+	thePokedex := pokedex{m: make(map[string]Pokemon)}
 
 	for {
 		fmt.Print("pokedex > ")
@@ -198,6 +262,31 @@ func main() {
 				data := parseJsonExplore(res, &locationExplore)
 				cache.Add("https://pokeapi.co/api/v2/location-area/"+splitString[1], data, "", "")
 			}
+		case "catch":
+			if !thePokedex.m[splitString[1]].caught {
+				if _, ok := thePokedex.m[splitString[1]]; !ok {
+					res, err := http.Get("https://pokeapi.co/api/v2/pokemon/" + splitString[1])
+					if err != nil {
+						fmt.Println("No pokemon named", splitString[1])
+						log.Fatal(err)
+					}
+					parsePokemon(res, &pokemon)
+					thePokedex.m[splitString[1]] = pokemon
+				}
+				fmt.Printf("Throwing a Pokeball at %s...\n", splitString[1])
+				time.Sleep(2 * time.Second)
+				if catch := catchingThePokemon(thePokedex.m[splitString[1]].BaseExperience); catch {
+					fmt.Println(splitString[1], "was caught!")
+					pokemon.caught = true
+					thePokedex.m[splitString[1]] = pokemon
+				} else {
+					fmt.Println(splitString[1], "escaped!")
+				}
+			} else {
+				fmt.Println(splitString[1], "has already been caught")
+			}
+		case "inspect":
+
 		case "exit":
 			return
 		default:
