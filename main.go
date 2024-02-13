@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	pokecache "github.com/AlexanderSolman/go_pokedex/internal"
@@ -18,7 +19,7 @@ type cliCommand struct {
 	description string
 }
 
-type jsonResponse struct {
+type jsonLocationResponse struct {
 	Count    int    `json:"count"`
 	Next     string `json:"next"`
 	Previous string `json:"previous"`
@@ -26,6 +27,15 @@ type jsonResponse struct {
 		Name string `json:"name"`
 		URL  string `json:"url"`
 	} `json:"results"`
+}
+
+type jsonLocationExplore struct {
+	PokemonEncounters []struct {
+		Pokemon struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"pokemon"`
+	} `json:"pokemon_encounters"`
 }
 
 func commands() map[string]cliCommand {
@@ -48,12 +58,12 @@ func commands() map[string]cliCommand {
 		},
 		"explore": {
 			name:        "explore",
-			description: "List pokémon in given area",
+			description: "explore <location-area> lists pokemon in the area",
 		},
 	}
 }
 
-func parseJsonResponse(res *http.Response, locationArea *jsonResponse) []byte {
+func parseJsonLocation(res *http.Response, locationArea *jsonLocationResponse) []byte {
 	body, err := io.ReadAll(res.Body)
 	res.Body.Close()
 
@@ -78,12 +88,38 @@ func parseJsonResponse(res *http.Response, locationArea *jsonResponse) []byte {
 	return addLocations
 }
 
+func parseJsonExplore(res *http.Response, locationExplore *jsonLocationExplore) []byte {
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+
+	if res.StatusCode > 299 {
+		log.Fatalf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, body)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	errr := json.Unmarshal(body, &locationExplore)
+	if errr != nil {
+		fmt.Println(errr, "\nCould not parse json")
+		return nil
+	}
+
+	addExplored := []byte{}
+	for _, i := range locationExplore.PokemonEncounters {
+		fmt.Println("-", i.Pokemon.Name)
+		addExplored = append(addExplored, []byte("- "+i.Pokemon.Name+"\n")...)
+	}
+	return addExplored
+}
+
 func main() {
-	var locationArea jsonResponse
+	var locationArea jsonLocationResponse
+	var locationExplore jsonLocationExplore
 	cache := pokecache.NewCache(5 * time.Minute) // Cache created at start with 5min interval
 
 	for {
-		fmt.Println("pokedex >")
+		fmt.Print("pokedex > ")
 
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
@@ -94,8 +130,9 @@ func main() {
 		}
 
 		m_com := commands()
+		splitString := strings.Split(scanner.Text(), " ")
 
-		switch scanner.Text() {
+		switch splitString[0] {
 		case "help":
 			fmt.Println("\nHow to use the Pokedex:\n\n")
 			fmt.Println("help: ", m_com["help"].description)
@@ -110,7 +147,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				data := parseJsonResponse(res, &locationArea)
+				data := parseJsonLocation(res, &locationArea)
 				cache.Add("https://pokeapi.co/api/v2/location-area/?offset=0&limit=20", data, locationArea.Next, locationArea.Previous)
 			} else {
 				// Checks if data is cached and prints else calls API for it and adds to cache
@@ -125,7 +162,7 @@ func main() {
 					if err != nil {
 						log.Fatal(err)
 					}
-					data := parseJsonResponse(res, &locationArea)
+					data := parseJsonLocation(res, &locationArea)
 					cache.Add(url, data, locationArea.Next, locationArea.Previous)
 				}
 			}
@@ -144,19 +181,27 @@ func main() {
 					if err != nil {
 						log.Fatal(err)
 					}
-					data := parseJsonResponse(res, &locationArea)
+					data := parseJsonLocation(res, &locationArea)
 					cache.Add(locationArea.Previous, data, locationArea.Next, locationArea.Previous)
 				}
 			}
 		case "explore":
-
+			if i, ok, _, _ := cache.Get("https://pokeapi.co/api/v2/location-area/" + splitString[1]); ok {
+				fmt.Println("From cache: \n")
+				fmt.Println(string(i))
+			} else {
+				res, err := http.Get("https://pokeapi.co/api/v2/location-area/" + splitString[1])
+				if err != nil {
+					log.Fatal(err)
+				}
+				fmt.Printf("Exploring %s...\n", splitString[1])
+				data := parseJsonExplore(res, &locationExplore)
+				cache.Add("https://pokeapi.co/api/v2/location-area/"+splitString[1], data, "", "")
+			}
 		case "exit":
 			return
 		default:
 			fmt.Println("Type <help> for information on usage")
 		}
-		// TEMP prints to check next and prev pointers
-		fmt.Println("Url for next: ", locationArea.Next)
-		fmt.Println("Url for previous: ", locationArea.Previous)
 	}
 }
