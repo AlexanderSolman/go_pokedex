@@ -35,5 +35,4 @@ The following commands are available in the Pokedex:
 
 ## Further Implementations
 
-- `explore`
 - .......
