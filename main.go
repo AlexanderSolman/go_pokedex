@@ -93,7 +93,7 @@ func commands() map[string]cliCommand {
 		},
 		"inspect": {
 			name:        "inspect",
-			description: "",
+			description: "Display information about caught pokemon",
 		},
 	}
 }
@@ -175,6 +175,18 @@ func catchingThePokemon(exp int) bool {
 	return false
 }
 
+func printInspectPokemon(pokemon Pokemon) {
+	fmt.Printf("Name: %s\nHeight: %v\nWeight: %v\nStats:\n", pokemon.Name, pokemon.Height, pokemon.Weight)
+	for _, i := range pokemon.Stats {
+		fmt.Printf("\t-%s: %v\n", i.Stat.Name, i.BaseStat)
+	}
+	fmt.Println("Types:")
+	for _, i := range pokemon.Types {
+		fmt.Printf("\t- %s\n", i.Type.Name)
+	}
+
+}
+
 func main() {
 	var locationArea jsonLocationResponse
 	var locationExplore jsonLocationExplore
@@ -199,10 +211,12 @@ func main() {
 		switch splitString[0] {
 		case "help":
 			fmt.Println("\nHow to use the Pokedex:\n\n")
-			fmt.Println("help: ", m_com["help"].description)
-			fmt.Println("map:  ", m_com["map"].description)
-			fmt.Println("mapb: ", m_com["mapb"].description)
-			fmt.Println("exit: ", m_com["exit"].description, "\n")
+			fmt.Println("help:     ", m_com["help"].description)
+			fmt.Println("map:      ", m_com["map"].description)
+			fmt.Println("mapb:     ", m_com["mapb"].description)
+			fmt.Println("explore:  ", m_com["explore"].description)
+			fmt.Println("inspect:  ", m_com["inspect"].description)
+			fmt.Println("exit:     ", m_com["exit"].description, "\n")
 		case "map":
 			// Initial call to the API given no call has been made.
 			// Data gets printed and added to the cache
@@ -279,6 +293,7 @@ func main() {
 					fmt.Println(splitString[1], "was caught!")
 					pokemon.caught = true
 					thePokedex.m[splitString[1]] = pokemon
+					pokemon.caught = false
 				} else {
 					fmt.Println(splitString[1], "escaped!")
 				}
@@ -286,7 +301,15 @@ func main() {
 				fmt.Println(splitString[1], "has already been caught")
 			}
 		case "inspect":
-
+			if i, ok := thePokedex.m[splitString[1]]; ok {
+				if thePokedex.m[splitString[1]].caught == true {
+					printInspectPokemon(i)
+				} else {
+					fmt.Println(splitString[1], "has not been caught yet!")
+				}
+			} else {
+				fmt.Println(splitString[1], "has not been caught yet!")
+			}
 		case "exit":
 			return
 		default:
