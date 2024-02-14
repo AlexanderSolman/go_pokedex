@@ -95,6 +95,10 @@ func commands() map[string]cliCommand {
 			name:        "inspect",
 			description: "Display information about caught pokemon",
 		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "Display all caught pokemon",
+		},
 	}
 }
 
@@ -191,6 +195,7 @@ func main() {
 	var locationArea jsonLocationResponse
 	var locationExplore jsonLocationExplore
 	var pokemon Pokemon
+
 	cache := pokecache.NewCache(5 * time.Minute) // Cache created at start with 5min interval
 	thePokedex := pokedex{m: make(map[string]Pokemon)}
 
@@ -216,6 +221,7 @@ func main() {
 			fmt.Println("mapb:     ", m_com["mapb"].description)
 			fmt.Println("explore:  ", m_com["explore"].description)
 			fmt.Println("inspect:  ", m_com["inspect"].description)
+			fmt.Println("pokedex:  ", m_com["pokedex"].description)
 			fmt.Println("exit:     ", m_com["exit"].description, "\n")
 		case "map":
 			// Initial call to the API given no call has been made.
@@ -309,6 +315,13 @@ func main() {
 				}
 			} else {
 				fmt.Println(splitString[1], "has not been caught yet!")
+			}
+		case "pokedex":
+			fmt.Println("The Pokedex:")
+			for _, v := range thePokedex.m {
+				if v.caught == true {
+					fmt.Printf("\t- %s\n", v.Name)
+				}
 			}
 		case "exit":
 			return
