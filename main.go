@@ -102,6 +102,7 @@ func commands() map[string]cliCommand {
 	}
 }
 
+// Below are 3 functions to parse the json responses and cache them seperately
 func parseJsonLocation(res *http.Response, locationArea *jsonLocationResponse) []byte {
 	body, err := io.ReadAll(res.Body)
 	res.Body.Close()
@@ -170,6 +171,7 @@ func parsePokemon(res *http.Response, pokemon *Pokemon) {
 	}
 }
 
+// Logic for the little catching the pokemon game
 func catchingThePokemon(exp int) bool {
 	// Base exp is our limit, if we roll > 0.75 * base exp we catch the pokemon
 	catchChance := rand.Intn(exp)
@@ -179,6 +181,7 @@ func catchingThePokemon(exp int) bool {
 	return false
 }
 
+// Function to print entries in pokedex
 func printInspectPokemon(pokemon Pokemon) {
 	fmt.Printf("Name: %s\nHeight: %v\nWeight: %v\nStats:\n", pokemon.Name, pokemon.Height, pokemon.Weight)
 	for _, i := range pokemon.Stats {
@@ -196,7 +199,9 @@ func main() {
 	var locationExplore jsonLocationExplore
 	var pokemon Pokemon
 
-	cache := pokecache.NewCache(5 * time.Minute) // Cache created at start with 5min interval
+	// Cache created at start with 5min interval
+	// Pokedex map initiated
+	cache := pokecache.NewCache(5 * time.Minute)
 	thePokedex := pokedex{m: make(map[string]Pokemon)}
 
 	for {
@@ -210,6 +215,8 @@ func main() {
 			log.Fatal(err)
 		}
 
+		// map of commands and variable to
+		// hold the given flag in certain commands
 		m_com := commands()
 		splitString := strings.Split(scanner.Text(), " ")
 
@@ -234,7 +241,7 @@ func main() {
 				data := parseJsonLocation(res, &locationArea)
 				cache.Add("https://pokeapi.co/api/v2/location-area/?offset=0&limit=20", data, locationArea.Next, locationArea.Previous)
 			} else {
-				// Checks if data is cached and prints else calls API for it and adds to cache
+				// Checks if data is cached and prints, else calls API for it and adds to cache
 				if i, ok, n, p := cache.Get(locationArea.Next); ok {
 					fmt.Println("From cache: \n")
 					fmt.Println(string(i))
@@ -251,6 +258,7 @@ func main() {
 				}
 			}
 		case "mapb":
+			// Same logic as map but backwards
 			if locationArea.Previous == "" {
 				fmt.Println("There were no previous locations")
 			} else {
@@ -270,6 +278,7 @@ func main() {
 				}
 			}
 		case "explore":
+			// Takes a location as flag and displays details. Repeated calls are from cache.
 			if i, ok, _, _ := cache.Get("https://pokeapi.co/api/v2/location-area/" + splitString[1]); ok {
 				fmt.Println("From cache: \n")
 				fmt.Println(string(i))
@@ -283,6 +292,9 @@ func main() {
 				cache.Add("https://pokeapi.co/api/v2/location-area/"+splitString[1], data, "", "")
 			}
 		case "catch":
+			/* Bool value 'caught' to seperate pokedex entries.
+			   The map acts as a cache after first API call but only
+			   removes the repeated API calls. It's then updated to be "added". */
 			if !thePokedex.m[splitString[1]].caught {
 				if _, ok := thePokedex.m[splitString[1]]; !ok {
 					res, err := http.Get("https://pokeapi.co/api/v2/pokemon/" + splitString[1])
@@ -293,13 +305,16 @@ func main() {
 					parsePokemon(res, &pokemon)
 					thePokedex.m[splitString[1]] = pokemon
 				}
+
 				fmt.Printf("Throwing a Pokeball at %s...\n", splitString[1])
 				time.Sleep(2 * time.Second)
+
 				if catch := catchingThePokemon(thePokedex.m[splitString[1]].BaseExperience); catch {
 					fmt.Println(splitString[1], "was caught!")
-					pokemon.caught = true
-					thePokedex.m[splitString[1]] = pokemon
-					pokemon.caught = false
+					if i, ok := thePokedex.m[splitString[1]]; ok {
+						i.caught = true
+						thePokedex.m[splitString[1]] = i
+					}
 				} else {
 					fmt.Println(splitString[1], "escaped!")
 				}
@@ -307,6 +322,7 @@ func main() {
 				fmt.Println(splitString[1], "has already been caught")
 			}
 		case "inspect":
+			// Checks if given pokemon is caught, i.e exists in the map
 			if i, ok := thePokedex.m[splitString[1]]; ok {
 				if thePokedex.m[splitString[1]].caught == true {
 					printInspectPokemon(i)
@@ -317,6 +333,7 @@ func main() {
 				fmt.Println(splitString[1], "has not been caught yet!")
 			}
 		case "pokedex":
+			// Displays all entries in pokedex
 			fmt.Println("The Pokedex:")
 			for _, v := range thePokedex.m {
 				if v.caught == true {
