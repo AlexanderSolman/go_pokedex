@@ -31,6 +31,10 @@ The following commands are available in the Pokedex:
 - `help`: Displays information about how to use the Pokedex.
 - `map`: Retrieves and displays information about location areas.
 - `mapb`: Retrieves and displays information about the previous location area.
+- `explore`: Displays pokemon in area.
+- `catch`: Tries to catch a given pokemon.
+- `inspect`: Displays data about a given pokemon.
+- `pokedex`: Lists all the caught pokemon.
 - `exit`: Exits the Pokedex application.
 
 ## Further Implementations
